@@ -1,0 +1,87 @@
+name: docker trivy
+
+on:
+  workflow_call:
+    inputs:
+      image-name:
+        description: "the name of the image"
+        type: string
+        required: true
+      image-tag:
+        description: "the version of the image to deploy, list of tags e.g. `dev,1.0.0`"
+        required: false
+        type: string
+      container-registry:
+        description: "the container registry to use"
+        default: "registry.hub.docker.com"
+        type: string
+        required: false
+      container-registry-user:
+        description: "the container registry user to use"
+        default: "mornedhels"
+        type: string
+        required: false
+      trivy-ignore-unfixed:
+        description: "default is `true`, see [trivy-action](https://github.com/aquasecurity/trivy-action)"
+        default: true
+        type: boolean
+        required: false
+      runner:
+        description: "the runner to use"
+        default: "ubuntu-latest"
+        type: string
+        required: false
+    secrets:
+      CONTAINER_REGISTRY_PASSWORD:
+        required: false
+
+jobs:
+  docker:
+    name: Docker Trivy Scan
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v3
+        if: inputs.image-tag == null
+        with:
+          fetch-depth: 0
+      - name: Set tag info
+        id: vars
+        run: |
+          if [ -n "${{ inputs.image-tag }}" ]; then
+              echo "GIT_TAG=${{ inputs.image-tag }}" >> $GITHUB_OUTPUT
+              exit 0
+          fi
+          
+          tag=$(git describe --tags --abbrev=0)
+          tag_sha=$(git rev-list -n 1 $latest_tag)
+          echo "GIT_TAG=$tag" >> $GITHUB_OUTPUT
+          echo "GIT_TAG_SHA=$tag_sha" >> $GITHUB_OUTPUT
+      - name: Docker Login
+        if: secrets.CONTAINER_REGISTRY_PASSWORD != null && github.event_name != 'pull_request'
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ inputs.container-registry }}
+          username: ${{ inputs.container-registry-user }}
+          password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.10.0
+        with:
+          image-ref: ${{ inputs.container-registry }}/${{ inputs.container-registry-user }}/${{ inputs.image-name }}:${{ steps.vars.outputs.GIT_TAG }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          ignore-unfixed: ${{ inputs.trivy-ignore-unfixed }}
+          vuln-type: 'os,library'
+          scanners: 'vuln'
+          severity: 'CRITICAL,HIGH'
+      - name: Upload Trivy results for tag ${{ steps.vars.outputs.GIT_TAG }}
+        if: steps.vars.outputs.GIT_TAG_SHA != null
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: trivy-results.sarif
+          ref: refs/tags/${{ steps.vars.outputs.GIT_TAG }}
+          sha: ${{ steps.vars.outputs.GIT_TAG_SHA }}
+      - name: Upload Trivy results
+        if: steps.vars.outputs.GIT_TAG_SHA == null
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: trivy-results.sarif
