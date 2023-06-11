@@ -53,7 +53,7 @@ jobs:
           fi
           
           tag=$(git describe --tags --abbrev=0)
-          tag_sha=$(git rev-list -n 1 $latest_tag)
+          tag_sha=$(git rev-list -n 1 $tag)
           echo "GIT_TAG=$tag" >> $GITHUB_OUTPUT
           echo "GIT_TAG_SHA=$tag_sha" >> $GITHUB_OUTPUT
       - name: Docker Login
