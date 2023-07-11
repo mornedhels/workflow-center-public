@@ -21,6 +21,10 @@ on:
         default: "linux/amd64"
         type: string
         required: false
+      build-args:
+        description: "the build args to use"
+        type: string
+        required: false
       buildx-version:
         description: "the version of buildx to use"
         type: string
@@ -95,6 +99,7 @@ jobs:
           load: true
           provenance: false
           platforms: ${{ inputs.platform }}
+          build-args: ${{ inputs.build-args }}
           tags: ${{ steps.meta.outputs.tags }}
       - name: Run Trivy vulnerability scanner
         if: inputs.trivy-scan == true
