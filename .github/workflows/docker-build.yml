@@ -85,7 +85,7 @@ jobs:
           password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
       - name: Docker meta
         id: meta
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v5
         with:
           images: ${{ inputs.container-registry }}/${{ inputs.container-registry-user }}/${{ inputs.image-name }}
           tags: ${{ inputs.image-tag }}
