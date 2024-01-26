@@ -110,6 +110,7 @@ jobs:
           output: 'trivy-results.sarif'
           exit-code: '1'
           ignore-unfixed: ${{ inputs.trivy-ignore-unfixed }}
+          limit-severities-for-sarif: ${{ inputs.trivy-ignore-unfixed }}
           vuln-type: 'os,library'
           scanners: 'vuln'
           severity: 'CRITICAL,HIGH'
