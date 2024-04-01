@@ -66,7 +66,7 @@ jobs:
           username: ${{ inputs.container-registry-user }}
           password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@0.16.1
+        uses: aquasecurity/trivy-action@0.19.0
         with:
           image-ref: ${{ inputs.container-registry }}/${{ inputs.container-registry-user }}/${{ inputs.image-name }}:${{ steps.vars.outputs.GIT_TAG }}
           format: 'sarif'
