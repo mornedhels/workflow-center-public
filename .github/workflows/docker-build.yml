@@ -39,13 +39,12 @@ on:
         default: "mornedhels"
         type: string
         required: false
-      trivy-scan:
-        description: "indicates whether to perform the trivy scan, default is `true`"
-        default: true
-        type: boolean
+      dockerhub-username:
+        description: "the dockerhub username to use"
+        type: string
         required: false
-      trivy-ignore-unfixed:
-        description: "default is `true`, see [trivy-action](https://github.com/aquasecurity/trivy-action)"
+      docker-scan:
+        description: "indicates whether to perform docker scout scan, default is `true`"
         default: true
         type: boolean
         required: false
@@ -59,9 +58,19 @@ on:
         default: "ubuntu-latest"
         type: string
         required: false
+      debug:
+        description: "enable debug mode"
+        default: false
+        type: boolean
     secrets:
+      CONTAINER_REGISTRY_USER:
+        required: false
       CONTAINER_REGISTRY_PASSWORD:
         required: true
+      DOCKERHUB_USERNAME:
+        required: false
+      DOCKERHUB_TOKEN:
+        required: false
 
 jobs:
   docker:
@@ -81,8 +90,14 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ${{ inputs.container-registry }}
-          username: ${{ inputs.container-registry-user }}
+          username: ${{ secrets.CONTAINER_REGISTRY_USER || inputs.container-registry-user }}
           password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
+      - name: Login to Docker Hub
+        if: inputs.docker-scan == true
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME  || inputs.dockerhub-username }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -92,36 +107,42 @@ jobs:
           flavor: |
             latest=false
       - name: Docker build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.project-root }}
+          file: ${{ inputs.dockerfile }}
+          provenance: false
+          platforms: ${{ inputs.platform }}
+          build-args: ${{ inputs.build-args }}
+          tags: ${{ steps.meta.outputs.tags }}
+      - name: Load Docker image (prepare docker scout)
+        if: inputs.docker-scan == true
+        uses: docker/build-push-action@v6
         with:
           context: ${{ inputs.project-root }}
           file: ${{ inputs.dockerfile }}
           load: true
           provenance: false
-          platforms: ${{ inputs.platform }}
           build-args: ${{ inputs.build-args }}
           tags: ${{ steps.meta.outputs.tags }}
-      - name: Run Trivy vulnerability scanner
-        if: inputs.trivy-scan == true
-        uses: aquasecurity/trivy-action@0.16.1
+      - name: Docker Scout
+        if: inputs.docker-scan == true
+        uses: docker/scout-action@v1
         with:
-          image-ref: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-          exit-code: '1'
-          ignore-unfixed: ${{ inputs.trivy-ignore-unfixed }}
-          limit-severities-for-sarif: ${{ inputs.trivy-ignore-unfixed }}
-          vuln-type: 'os,library'
-          scanners: 'vuln'
-          severity: 'CRITICAL,HIGH'
-      - name: Upload Trivy scan results to GitHub Security tab
-        if: always() && inputs.trivy-scan == true && hashFiles('trivy-results.sarif') != ''
+          command: cves,compare
+          image: local://${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+          to: registry://${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+          sarif-file: sarif.output.json
+          ignore-unchanged: true
+          write-comment: true
+      - name: Upload Docker Scout scan results to GitHub Security tab
+        if: always() && inputs.docker-scan == true && hashFiles('sarif.output.json') != ''
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: 'trivy-results.sarif'
+          sarif_file: sarif.output.json
       - name: Docker push
         if: github.event_name != 'pull_request'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ${{ inputs.project-root }}
           file: ${{ inputs.dockerfile }}
@@ -129,3 +150,7 @@ jobs:
           provenance: false
           platforms: ${{ inputs.platform }}
           tags: ${{ steps.meta.outputs.tags }}
+      - name: Debug
+        if: always() && inputs.debug == true
+        uses: mxschmitt/action-tmate@v3
+        timeout-minutes: 15
