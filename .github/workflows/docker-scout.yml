@@ -1,0 +1,114 @@
+name: docker scout
+
+on:
+  workflow_call:
+    inputs:
+      image-name:
+        description: "the name of the image"
+        type: string
+        required: true
+      image-tag:
+        description: "the version of the image to deploy, list of tags e.g. `dev,1.0.0`"
+        required: false
+        type: string
+      container-registry:
+        description: "the container registry to use"
+        default: "registry.hub.docker.com"
+        type: string
+        required: false
+      container-registry-user:
+        description: "the container registry user to use"
+        default: "mornedhels"
+        type: string
+        required: false
+      dockerhub-username:
+        description: "the dockerhub username to use"
+        type: string
+        required: false
+      runner:
+        description: "the runner to use"
+        default: "ubuntu-latest"
+        type: string
+        required: false
+      debug:
+        description: "enable debug mode"
+        default: false
+        type: boolean
+    secrets:
+      CONTAINER_REGISTRY_USER:
+        required: false
+      CONTAINER_REGISTRY_PASSWORD:
+        required: true
+      DOCKERHUB_USERNAME:
+        required: false
+      DOCKERHUB_TOKEN:
+        required: false
+
+jobs:
+  docker:
+    name: Docker Scout Scan
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        if: inputs.image-tag == null
+        with:
+          fetch-depth: 0
+      - name: Set tag info
+        id: vars
+        run: |
+          if [ -n "${{ inputs.image-tag }}" ]; then
+              echo "GIT_TAG=${{ inputs.image-tag }}" >> $GITHUB_OUTPUT
+              exit 0
+          fi
+          
+          tag=$(git describe --tags --abbrev=0)
+          tag_sha=$(git rev-list -n 1 $tag)
+          echo "GIT_TAG=$tag" >> $GITHUB_OUTPUT
+          echo "GIT_TAG_SHA=$tag_sha" >> $GITHUB_OUTPUT
+      - name: Docker Login
+        if: env.CONTAINER_REGISTRY_PASSWORD != null && github.event_name != 'pull_request'
+        env:
+          CONTAINER_REGISTRY_PASSWORD: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ inputs.container-registry }}
+          username: ${{ secrets.CONTAINER_REGISTRY_USER || inputs.container-registry-user }}
+          password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME  || inputs.dockerhub-username }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Load Docker image (prepare docker scout)
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.project-root }}
+          file: ${{ inputs.dockerfile }}
+          load: true
+          provenance: false
+          build-args: ${{ inputs.build-args }}
+          tags: ${{ steps.meta.outputs.tags }}
+      - name: Docker Scout
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: ${{ inputs.container-registry }}/${{ inputs.container-registry-user }}/${{ inputs.image-name }}:${{ steps.vars.outputs.GIT_TAG }}
+          sarif-file: sarif.output.json
+          ignore-unchanged: true
+          write-comment: true
+      - name: Upload Docker Scout results for tag ${{ steps.vars.outputs.GIT_TAG }}
+        if: steps.vars.outputs.GIT_TAG_SHA != null
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: sarif.output.json
+          ref: refs/tags/${{ steps.vars.outputs.GIT_TAG }}
+          sha: ${{ steps.vars.outputs.GIT_TAG_SHA }}
+      - name: Upload Docker Scout results
+        if: steps.vars.outputs.GIT_TAG_SHA == null
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: sarif.output.json
+      - name: Debug
+        if: always() && inputs.debug == true
+        uses: mxschmitt/action-tmate@v3
+        timeout-minutes: 15
