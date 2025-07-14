@@ -149,16 +149,21 @@ jobs:
           write-comment: false
           summary: false
           only-severities: "critical,high,medium"
-      - name: Archive sarif
-        uses: actions/upload-artifact@v4
-        with:
-          name: sarif-${{ inputs.image-name }}-${{ inputs.image-tag }}
-          path: sarif.output.json
+      - name: Limit SARIF locations
+        run: |
+          jq '
+            .runs[0].results |= map(
+              if (.locations | length) > 1000
+              then .locations = (.locations[:1000]) | .
+              else .
+              end
+            )
+          ' sarif.output.json > sarif.output.limited.json
       - name: Upload Docker Scout scan results to GitHub Security tab
         if: always() && inputs.docker-scan == true && hashFiles('sarif.output.json') != ''
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: sarif.output.json
+          sarif_file: sarif.output.limited.json
           category: ${{ inputs.scan-category }}
       - name: Docker push
         if: github.event_name != 'pull_request'
