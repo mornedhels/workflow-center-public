@@ -92,6 +92,11 @@ jobs:
           sarif-file: sarif.output.json
           write-comment: false
           only-severities: "critical,high,medium"
+      - name: Archive artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sarif-${{ inputs.image-name }}-${{ inputs.image-tag }}
+          path: sarif.output.json
       - name: Upload Docker Scout results for tag ${{ steps.vars.outputs.GIT_TAG }}
         if: steps.vars.outputs.GIT_TAG_SHA != null
         uses: github/codeql-action/upload-sarif@v3
