@@ -104,7 +104,7 @@ jobs:
           ' sarif.output.json > sarif.output.limited.json
       - name: Upload Docker Scout results for tag ${{ steps.vars.outputs.GIT_TAG }}
         if: steps.vars.outputs.GIT_TAG_SHA != null
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: sarif.output.limited.json
           category: ${{ inputs.scan-category }}
@@ -112,7 +112,7 @@ jobs:
           sha: ${{ steps.vars.outputs.GIT_TAG_SHA }}
       - name: Upload Docker Scout results
         if: steps.vars.outputs.GIT_TAG_SHA == null
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: sarif.output.json
           category: ${{ inputs.scan-category }}

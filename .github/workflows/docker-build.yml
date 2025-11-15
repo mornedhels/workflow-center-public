@@ -161,7 +161,7 @@ jobs:
           ' sarif.output.json > sarif.output.limited.json
       - name: Upload Docker Scout scan results to GitHub Security tab
         if: always() && inputs.docker-scan == true && hashFiles('sarif.output.json') != ''
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: sarif.output.limited.json
           category: ${{ inputs.scan-category }}
