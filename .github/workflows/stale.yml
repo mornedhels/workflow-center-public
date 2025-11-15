@@ -19,9 +19,9 @@ jobs:
           stale-pr-message: >-
             This PR has been marked as stale because it has not had recent activity.
             The bot will close the PR if no further action occurs.
-          exempt-issue-labels: pinned
-          exempt-pr-labels: pinned
-          stale-issue-label: stale
-          stale-pr-label: stale
+          exempt-issue-labels: "pinned :pushpin:"
+          exempt-pr-labels: "pinned :pushpin:"
+          stale-issue-label: "stale :zzz:"
+          stale-pr-label: "stale :zzz:"
           days-before-close: 30
           days-before-stale: 90
