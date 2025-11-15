@@ -82,7 +82,7 @@ jobs:
     name: Docker Build & Push
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Set up QEMU
         if: ${{ inputs.platform != 'linux/amd64' }}
         uses: docker/setup-qemu-action@v3
