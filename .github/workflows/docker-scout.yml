@@ -54,7 +54,7 @@ jobs:
     name: Docker Scout Scan
     runs-on: ${{ inputs.runner }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         if: inputs.image-tag == null
         with:
           fetch-depth: 0
