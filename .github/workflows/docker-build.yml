@@ -98,7 +98,7 @@ jobs:
           username: ${{ secrets.CONTAINER_REGISTRY_USER || inputs.container-registry-user }}
           password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
       - name: Login to Docker Hub
-        if: inputs.docker-scan == true
+        if: inputs.docker-scan == true && github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME  || inputs.dockerhub-username }}
@@ -121,7 +121,7 @@ jobs:
           build-args: ${{ inputs.build-args }}
           tags: ${{ steps.meta.outputs.tags }}
       - name: Load Docker image (prepare docker scout)
-        if: inputs.docker-scan == true
+        if: inputs.docker-scan == true && github.event_name != 'pull_request'
         uses: docker/build-push-action@v6
         with:
           context: ${{ inputs.project-root }}
@@ -131,7 +131,7 @@ jobs:
           build-args: ${{ inputs.build-args }}
           tags: ${{ steps.meta.outputs.tags }}
       - name: Docker Scout
-        if: inputs.docker-scan == true
+        if: inputs.docker-scan == true && github.event_name != 'pull_request'
         uses: docker/scout-action@v1
         with:
           command: cves,compare
@@ -140,7 +140,7 @@ jobs:
           ignore-unchanged: true
           write-comment: false
       - name: Docker Scout sarif
-        if: inputs.docker-scan == true
+        if: inputs.docker-scan == true && github.event_name != 'pull_request'
         uses: docker/scout-action@v1
         with:
           command: cves
@@ -150,6 +150,7 @@ jobs:
           summary: false
           only-severities: "critical,high,medium"
       - name: Limit SARIF locations
+        if: inputs.docker-scan == true && github.event_name != 'pull_request'
         run: |
           jq '
             .runs[0].results |= map(
@@ -160,7 +161,7 @@ jobs:
             )
           ' sarif.output.json > sarif.output.limited.json
       - name: Upload Docker Scout scan results to GitHub Security tab
-        if: always() && inputs.docker-scan == true && hashFiles('sarif.output.json') != ''
+        if: always() && inputs.docker-scan == true && github.event_name != 'pull_request' && hashFiles('sarif.output.json') != ''
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: sarif.output.limited.json
